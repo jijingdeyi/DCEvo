@@ -9,7 +9,8 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 
 ## Datasets
 We provide a demo dataset in **"DCEvo/datasets"**.
-Image fusion full datasets are available [here](https://github.com/RollingPlain/IVIF_ZOO/).  
+
+We test image fusion full datasets according to the [project](https://github.com/RollingPlain/IVIF_ZOO/).  
 
 
 
