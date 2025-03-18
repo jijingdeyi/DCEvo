@@ -6,19 +6,23 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 ![Abstract](Figure/first_figure.jpg)
 
 
-
 ## Datasets
 We provide a demo dataset in **"DCEvo/datasets"**.
 
-We test image fusion full datasets according to the [project](https://github.com/RollingPlain/IVIF_ZOO/).  
-
-
+We test image fusion according to full datasets in the [project](https://github.com/RollingPlain/IVIF_ZOO/).  
 
 
 ## Test Image Fusion  
 Our checkpoints can be found in **"DCEvo/ckpt"**. Then, you can test our pure fusion method through
 ```
 python test_Fusion.py
+```
+
+
+## Color Gray Images  
+You can color the output gray images for task-guided image fusion training and testing through
+```
+python tocolor.py
 ```
 
 
