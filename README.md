@@ -4,3 +4,25 @@ Jinyuan Liu, Bowei Zhang, Qingyun Mei, Xingyuan Li, Yang Zou, Zhiying Jiang, Lon
 IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 
 ![Abstract](Figure/first_figure.jpg)
+
+
+
+## Test Image Fusion  
+Our checkpoints can be found in "DCEvo/ckpt". Then, you can test our pure fusion method through
+```
+python test_Fusion.py
+```
+
+
+## Test Task-Guided Image Fusion  
+You can test our task-guided fusion method through
+```
+python test_task_guided_fusion.py
+```
+
+
+## Train Task-Guided Image Fusion  
+You can train our task-guided fusion method through
+```
+python DCEvo_train.py
+```
