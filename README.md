@@ -27,6 +27,7 @@ python tocolor.py
 
 
 ## Test Task-Guided Image Fusion  
+Training this pipeline needs to generate **RGB Pure Fusion** images in **"DCEvo/datasets/M3FD/images"**.
 You can test our task-guided fusion method through
 ```
 python test_task_guided_fusion.py
@@ -34,6 +35,7 @@ python test_task_guided_fusion.py
 
 
 ## Train Task-Guided Image Fusion  
+Training this pipeline needs to generate **RGB Pure Fusion** images in **"DCEvo/datasets/M3FD/train/images"**.
 You can train our task-guided fusion method through
 ```
 python DCEvo_train.py
