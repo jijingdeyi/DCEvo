@@ -24,7 +24,6 @@ python test_Fusion.py
 ```
 python tocolor.py
 ```
-```
 
 
 ## 融合结果
