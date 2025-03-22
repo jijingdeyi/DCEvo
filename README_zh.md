@@ -6,7 +6,7 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 ![Abstract](Figure/first_figure.jpg)
 
 
-## Datasets
+## 数据集
 我们在 **"DCEvo/datasets"** 中提供了数据集的示例。
 
 我们测试图像融合依据 [这个项目](https://github.com/RollingPlain/IVIF_ZOO/) 的完整数据集。
@@ -19,7 +19,7 @@ python test_Fusion.py
 ```
 
 
-## 上色灰度图像Color Gray Images  
+## 上色灰度图像
 可以通过下方上色灰度图片用于任务引导的图像融合训练和测试：
 ```
 python tocolor.py
