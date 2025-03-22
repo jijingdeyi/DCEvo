@@ -1,6 +1,6 @@
 # DCEvo
 
-Jinyuan Liu, Bowei Zhang, Qingyun Mei, Xingyuan Li, Yang Zou, Zhiying Jiang, Long Ma, Risheng Liu, Xin Fan, **"DCEvo: Discriminative Cross-dimensional Evolutionary Learning for Infrared and Visible Image Fusion"**,
+Jinyuan Liu, Bowei Zhang, Qingyun Mei, Xingyuan Li, Yang Zou, Zhiying Jiang, Long Ma, Risheng Liu, Xin Fan, **"DCEvo: Discriminative Cross-Dimensional Evolutionary Learning for Infrared and Visible Image Fusion"**,
 IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 
 ![Abstract](Figure/first_figure.jpg)
@@ -27,7 +27,7 @@ python tocolor.py
 
 
 ## Test Task-Guided Image Fusion  
-Training this pipeline needs to generate **RGB Pure Fusion** images in **"DCEvo/datasets/M3FD/images"**.
+Testing this pipeline needs to generate **RGB Pure Fusion** images in **"DCEvo/datasets/M3FD/images"**.
 You can test our task-guided fusion method through
 ```
 python test_task_guided_fusion.py
