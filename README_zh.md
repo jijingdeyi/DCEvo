@@ -35,7 +35,7 @@ python tocolor.py
 
 
 ## 测试任务驱动的图像融合  
-测试 **"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
+测试需要 **"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
 通过以下代码，可以测试任务引导的图像融合：
 ```
 python test_task_guided_fusion.py
