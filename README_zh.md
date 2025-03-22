@@ -27,7 +27,7 @@ python tocolor.py
 
 
 ## 测试任务人道的图像融合  
-测试**"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
+测试 **"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
 通过以下代码，可以测试任务引导的图像融合：
 ```
 python test_task_guided_fusion.py
@@ -35,7 +35,7 @@ python test_task_guided_fusion.py
 
 
 ## 训练   
-训练此过程需要先在**"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
+训练此过程需要先在 **"DCEvo/datasets/M3FD/images"** 中生成 **RGB 纯融合** 图像。
 通过以下代码，可以训练任务引导的图像融合：
 ```
 python DCEvo_train.py
