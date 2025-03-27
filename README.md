@@ -11,6 +11,16 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 [2025-03-26] The Chinese translation is available! [[中译版本](./pdf/CN_paper.pdf)]   
 
 
+## Environment
+```
+# create virtual environment
+conda create -n DCEvo python=3.9
+conda activate DCEvo
+# install requirements
+pip install -r requirements.txt
+```
+
+
 ## Datasets Preparation
 We provide a demo dataset in **"DCEvo/datasets"**.
 
