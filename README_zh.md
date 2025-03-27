@@ -6,10 +6,25 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 ![Abstract](Figure/first_figure.jpg)
 
 
+## 更新
+[2025-03-26] 我们的论文已经线上更新！ [[arXiv 版本](https://arxiv.org/abs/2503.17673)]  
+[2025-03-26] 中译版本已更新！ [[中译版本](./pdf/CN_paper.pdf)]   
+
+
+## 环境配置
+```
+# create virtual environment
+conda create -n DCEvo python=3.9
+conda activate DCEvo
+# install requirements
+pip install -r requirements.txt
+```
+
+
 ## 数据集准备
 我们在 **"DCEvo/datasets"** 中提供了数据集的示例。
 
-我们测试图像融合依据 [这个项目](https://github.com/RollingPlain/IVIF_ZOO/) 的完整数据集。
+我们测试图像融合依据 [IVIF ZOO Project 项目](https://github.com/RollingPlain/IVIF_ZOO/) 的完整数据集。
 
 
 ## 测试图像融合  
