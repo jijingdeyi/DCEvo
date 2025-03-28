@@ -74,3 +74,14 @@ You can train our task-guided fusion method through
 ```
 python DCEvo_train.py
 ```
+
+
+## Citation
+```
+@article{li2025difiisr,
+  title={DCEvo: Discriminative Cross-Dimensional Evolutionary Learning for Infrared and Visible Image Fusion},
+  author={Liu, Jinyuan and Zhang, Bowei and Mei, Qingyun and Li, Xingyuan and Zou, Yang and Jiang, Zhiying and Ma, Long and Liu, Risheng and Fan, Xin},
+  journal={arXiv preprint arXiv:2503.17673},
+  year={2025}
+}
+```
