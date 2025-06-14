@@ -7,7 +7,8 @@ IEEE/CVF Conference on Computer Vision and Pattern Recognition **(CVPR)**, 2025.
 
 
 ## Updates
-[2025-03-26] Our paper is available online! [[arXiv version](https://arxiv.org/abs/2503.17673)]  
+[2025-03-26] Our paper is available on CVPR open access! [[CVPR Version](https://openaccess.thecvf.com/content/CVPR2025/html/Liu_DCEvo_Discriminative_Cross-Dimensional_Evolutionary_Learning_for_Infrared_and_Visible_Image_CVPR_2025_paper.html)]  
+[2025-03-26] Our paper is available online! [[arXiv Version](https://arxiv.org/abs/2503.17673)]  
 [2025-03-26] The Chinese translation is available! [[中译版本](./pdf/CN_paper.pdf)]   
 
 
@@ -78,10 +79,12 @@ python DCEvo_train.py
 
 ## Citation
 ```
-@article{li2025difiisr,
-  title={DCEvo: Discriminative Cross-Dimensional Evolutionary Learning for Infrared and Visible Image Fusion},
-  author={Liu, Jinyuan and Zhang, Bowei and Mei, Qingyun and Li, Xingyuan and Zou, Yang and Jiang, Zhiying and Ma, Long and Liu, Risheng and Fan, Xin},
-  journal={arXiv preprint arXiv:2503.17673},
-  year={2025}
+@InProceedings{Liu_2025_CVPR,
+    author    = {Liu, Jinyuan and Zhang, Bowei and Mei, Qingyun and Li, Xingyuan and Zou, Yang and Jiang, Zhiying and Ma, Long and Liu, Risheng and Fan, Xin},
+    title     = {DCEvo: Discriminative Cross-Dimensional Evolutionary Learning for Infrared and Visible Image Fusion},
+    booktitle = {Proceedings of the Computer Vision and Pattern Recognition Conference (CVPR)},
+    month     = {June},
+    year      = {2025},
+    pages     = {2226-2235}
 }
 ```
