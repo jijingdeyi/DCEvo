@@ -408,7 +408,7 @@ def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), insta
             LOGGER.warning(f'{prefix} ❌ {e}')
 
 
-def check_img_size(imgsz, s=32, floor=0):
+def check_img_size(imgsz, s=32, floor=0) -> int | list[int]:
     # Verify image size is a multiple of stride s in each dimension
     if isinstance(imgsz, int):  # integer i.e. img_size=640
         new_size = max(make_divisible(imgsz, int(s)), floor)
@@ -490,7 +490,7 @@ def check_font(font=FONT, progress=False):
         torch.hub.download_url_to_file(url, str(file), progress=progress)
 
 
-def check_dataset(data, autodownload=True):
+def check_dataset(data, autodownload=True) -> dict:
     # Download, check and/or unzip dataset if not found locally
 
     # Download (optional)

@@ -84,6 +84,7 @@ class CrossAttentionBlock(nn.Module):
         return x
 
 
+# dual freaquency feature encoder
 class DFFeatureEncoder(nn.Module):
     def __init__(self,
                 inp_channels=1,
@@ -121,7 +122,8 @@ class DFFeatureEncoder(nn.Module):
                 (out_enc_level1+self.crossatt[2](out_enc_level1, in_det_img)))
 
 
-
+# Channel-wise self-attention
+# (b,c,h,w) -> (b,c,h,w)  maybe from Restormer
 class AttentionBase(nn.Module):
     def __init__(self,
                 dim,   
@@ -150,20 +152,32 @@ class AttentionBase(nn.Module):
         out = rearrange(out, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
         out = self.proj(out)
         return out
-    
+
+
+# Depth-wise conv feed forward network
+# (b,c,h,w) -> (b,c,h,w)  maybe from Restormer
 class Mlp(nn.Module):
-    def __init__(self, 
-                in_features, 
-                hidden_features=None, 
-                ffn_expansion_factor = 2,
-                bias = False):
+    def __init__(
+        self, in_features, hidden_features=None, ffn_expansion_factor=2, bias=False
+    ):
         super().__init__()
-        hidden_features = int(in_features*ffn_expansion_factor)
-        self.project_in = nn.Conv2d(in_features, hidden_features*2, kernel_size=1, bias=bias)
-        self.dwconv = nn.Conv2d(hidden_features*2, hidden_features*2, kernel_size=3,
-                                stride=1, padding=1, groups=hidden_features, bias=bias)
-        self.project_out = nn.Conv2d(hidden_features, in_features, kernel_size=1, bias=bias)
-                    
+        hidden_features = int(in_features * ffn_expansion_factor)
+        self.project_in = nn.Conv2d(
+            in_features, hidden_features * 2, kernel_size=1, bias=bias
+        )
+        self.dwconv = nn.Conv2d(
+            hidden_features * 2,
+            hidden_features * 2,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            groups=hidden_features,
+            bias=bias,
+        )
+        self.project_out = nn.Conv2d(
+            hidden_features, in_features, kernel_size=1, bias=bias
+        )
+
     def forward(self, x):
         x = self.project_in(x)
         x1, x2 = self.dwconv(x).chunk(2, dim=1)
@@ -172,6 +186,7 @@ class Mlp(nn.Module):
         return x
 
 
+# Equation 3
 class prominent(nn.Module):
     def __init__(self, channels=0):
         super(prominent, self).__init__()
@@ -181,7 +196,7 @@ class prominent(nn.Module):
     def forward(self, x):
         y = self.act(x)
         return self.act2(x * self.act(y.pow(2) / y.mean(dim=[2, 3], keepdim=True)))
-        
+
 
 class LowFreqExtractor(nn.Module):
     def __init__(self, dim,):
@@ -193,7 +208,9 @@ class LowFreqExtractor(nn.Module):
         return self.net2(self.net1(x))
 
 
-class simam_module(torch.nn.Module):
+# maybe to compare with prominent
+# (b,c,h,w) -> (b,c,h,w)
+class simam_module(nn.Module):
     def __init__(self, channels = None, e_lambda = 1e-4):
         super(simam_module, self).__init__()
         self.activaton = nn.Sigmoid()
@@ -216,6 +233,7 @@ class simam_module(torch.nn.Module):
         return x * self.activaton(y)
 
 
+# (b,inp,h,w) -> (b,oup,h,w)
 class DWBlock(nn.Module):
     def __init__(self, inp, oup,):
         super(DWBlock, self).__init__()
@@ -233,6 +251,8 @@ class DWBlock(nn.Module):
     def forward(self, x):
         return self.bottleneckBlock(x)    # SHOULD BE NO RESIDUAL CONNECTION
 
+
+# no change shape
 class DetailNode(nn.Module):
     def __init__(self):
         super(DetailNode, self).__init__()
@@ -254,6 +274,8 @@ class DetailNode(nn.Module):
         z1 = z1 * torch.exp(self.theta_rho(z2)) + self.theta_eta(z2)
         return self.pmt(z1), self.pmt(z2)
 
+
+# no change shape
 class HighFreqExtractor(nn.Module):
     def __init__(self, num_layers=3):
         super(HighFreqExtractor, self).__init__()
@@ -273,19 +295,23 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
     if p is None:
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
-    
+
 
 class Conv(nn.Module):
     default_act = nn.SiLU(inplace=True)  # default activation
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__()
-        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
+        padding = autopad(k, p, d)
+        if isinstance(padding, list):
+            padding = tuple(padding)
+        self.conv = nn.Conv2d(c1, c2, k, s, padding, groups=g, dilation=d, bias=False)
         self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
     def forward(self, x):
         return self.act((self.conv(x)))
 
 
+# Not use the simam_module here
 class Bottleneck(nn.Module):
     def __init__(self, c1, c2, shortcut=False, g=1, k=(3, 3), e=0.5):
         super().__init__()
@@ -298,7 +324,8 @@ class Bottleneck(nn.Module):
     def forward(self, x):
         return x + (self.cv2(self.cv1(x))) if self.add else (self.cv2(self.cv1(x)))
 
-    
+
+# It seems c1 == c2
 class C2f(nn.Module):
     def __init__(self, c1, c2, n=2, shortcut=True, g=1, e=0.5, partnum=1):
         super().__init__()
@@ -309,8 +336,8 @@ class C2f(nn.Module):
         self.att = prominent(c2)
 
     def forward(self, x):
-        y = list(self.cv1(x).chunk(2, 1))
-        y.extend(m(y[-1]) for m in self.m)
+        y = list(self.cv1(x).chunk(2, 1)) # [b,self.c,h,w]*2
+        y.extend(m(y[-1]) for m in self.m) # y=[b,self.c,h,w]* (2+n)
         return x + self.att(self.cv2(torch.cat(y, 1)))
 
 
@@ -352,7 +379,7 @@ class WithBias_LayerNorm(nn.Module):
     def forward(self, x):
         mu = x.mean(-1, keepdim=True)
         sigma = x.var(-1, keepdim=True, unbiased=False)
-        return (x - mu) / torch.sqrt(sigma+1e-5)+ self.bias           # * self.weight 
+        return (x - mu) / torch.sqrt(sigma+1e-5) + self.bias           # * self.weight 
 
 
 class LayerNorm(nn.Module):
@@ -367,7 +394,8 @@ class LayerNorm(nn.Module):
         h, w = x.shape[-2:]
         return to_4d(self.body(to_3d(x)), h, w)
 
-        
+
+#  (b,c,h,w) -> (b,c,h,w)
 class FeedForward(nn.Module):
     def __init__(self, dim, ffn_expansion_factor, bias):
         super(FeedForward, self).__init__()
@@ -385,6 +413,8 @@ class FeedForward(nn.Module):
         return x
 
 
+# (b,c,h,w) -> (b,c,h,w)
+# channel-wise self-attention from Restormer
 class Attention(nn.Module):
     def __init__(self, dim, num_heads, bias):
         super(Attention, self).__init__()
@@ -398,12 +428,9 @@ class Attention(nn.Module):
         b, c, h, w = x.shape
         qkv = self.qkv_dwconv(self.qkv(x))
         q, k, v = qkv.chunk(3, dim=1)
-        q = rearrange(q, 'b (head c) h w -> b head c (h w)',
-                    head=self.num_heads)
-        k = rearrange(k, 'b (head c) h w -> b head c (h w)',
-                    head=self.num_heads)
-        v = rearrange(v, 'b (head c) h w -> b head c (h w)',
-                    head=self.num_heads)
+        q = rearrange(q, "b (head c) h w -> b head c (h w)", head=self.num_heads)
+        k = rearrange(k, "b (head c) h w -> b head c (h w)", head=self.num_heads)
+        v = rearrange(v, "b (head c) h w -> b head c (h w)", head=self.num_heads)
 
         q = torch.nn.functional.normalize(q, dim=-1)
         k = torch.nn.functional.normalize(k, dim=-1)
@@ -437,7 +464,7 @@ class TransformerBlock(nn.Module):
 
         return x
 
-        
+
 class OverlapPatchEmbed(nn.Module):
     def __init__(self, in_c=3, embed_dim=48, bias=False):
         super(OverlapPatchEmbed, self).__init__()
@@ -473,7 +500,7 @@ class DE_Encoder(nn.Module):
         lf_feature = self.baseFeature(base_feature)
         hf_feature = self.detailFeature(base_feature)
         return lf_feature, hf_feature, base_feature
-        
+
 
 class DE_Decoder(nn.Module):
     def __init__(self,
@@ -501,7 +528,8 @@ class DE_Decoder(nn.Module):
             nn.Conv2d(int(dim)//2, out_channels, kernel_size=3,
                     stride=1, padding=0, bias=bias),
             )
-        self.sigmoid = nn.Sigmoid()              
+        self.sigmoid = nn.Sigmoid()         
+
     def forward(self, inp_img, base_feature, detail_feature):
         embedded_feature = torch.cat((base_feature, detail_feature), dim=1)
         embedded_feature = self.reduce_channel(embedded_feature)
@@ -514,5 +542,4 @@ class DE_Decoder(nn.Module):
         else:
             out = self.output(base_feature)
         return self.sigmoid(out), base_feature
-        
-
+ 

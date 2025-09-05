@@ -8,6 +8,7 @@ import datetime
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.cuda.amp import GradScaler
 from utils.loss_fusion import Fusionloss, cc
 import kornia
 from torch.utils.data import Dataset
@@ -31,9 +32,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import torch
 import torch.distributed as dist
-import torch.nn as nn
 import yaml
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -89,7 +88,7 @@ class RandomCropWithPosition(T.RandomCrop):
 
         return cropped_img, top, left
 
-    
+
 class RandomCropWithInfo(T.RandomCrop):
     def __call__(self, img):
         i, j, h, w = self.get_params(img, self.size)
@@ -141,10 +140,6 @@ def read_data(root: str):
     assert os.path.exists(root), "dataset root: {} does not exist.".format(root)
 
     train_root = root
-    assert os.path.exists(train_root), "train root: {} does not exist.".format(train_root)
-
-    train_images_visible_path = []
-    train_images_infrared_path = []
 
     supported = [".jpg", ".JPG", ".png", ".PNG", ".bmp", 'tif', 'TIF'] 
 
@@ -159,18 +154,9 @@ def read_data(root: str):
     train_visible_path.sort()
     train_infrared_path.sort()
 
-    assert len(train_visible_path) == len(train_infrared_path),' The length of train dataset does not match. low:{}, high:{}'.\
-                                         format(len(train_visible_path),len(train_infrared_path))
+    assert len(train_visible_path) == len(train_infrared_path), ' The length of train dataset does not match. vi: {}, ir: {}'.\
+                                         format(len(train_visible_path), len(train_infrared_path))
     print("Visible and Infrared images check finish")
-
-    for index in range(len(train_visible_path)):
-        img_visible_path=train_visible_path[index]
-        img_infrared_path=train_infrared_path[index]
-        train_images_visible_path.append(img_visible_path)
-        train_images_infrared_path.append(img_infrared_path)
-
-    total_dataset_nums = len(train_visible_path) + len(train_infrared_path) 
-    print("{} images were found in the dataset.".format(total_dataset_nums))
     print("{} visible images for training.".format(len(train_visible_path)))
     print("{} infrared images for training.".format(len(train_infrared_path)))
 
@@ -178,11 +164,40 @@ def read_data(root: str):
     return train_low_light_path_list
 
 
-def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictionary
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
-        Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
-        opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
-    callbacks.run('on_pretrain_routine_start')
+def train(hyp, opt, device, callbacks):  
+    """
+        hyp: hyperparameter,  is path/to/hyp.yaml or hyp dictionary
+    """
+    (
+        save_dir,
+        epochs,
+        batch_size,
+        weights,
+        single_cls,
+        evolve,
+        data,
+        cfg,
+        resume,
+        noval,
+        nosave,
+        workers,
+        freeze,
+    ) = (
+        Path(opt.save_dir),
+        opt.epochs,
+        opt.batch_size,
+        opt.weights,
+        opt.single_cls,
+        opt.evolve,
+        opt.data,
+        opt.cfg,
+        opt.resume,
+        opt.noval,
+        opt.nosave,
+        opt.workers,
+        opt.freeze,
+    )
+    callbacks.run("on_pretrain_routine_start")
 
     # Directories
     w = save_dir / 'weights'  # weights dir
@@ -226,7 +241,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     train_path, val_path = data_dict['train'], data_dict['val']
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
-    #is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
+    # is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
     is_coco = isinstance(val_path, str) and val_path.endswith('val2017.txt')  # COCO dataset
 
     # Model
@@ -247,11 +262,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     amp = check_amp(model)  # check AMP
 
     # Freeze
-    freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
-    for k, v in model.named_parameters():
-        if any(x in k for x in freeze):
-            LOGGER.info(f'freezing {k}')
-            v.requires_grad = False
+    freeze_prefixes = tuple(f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0])))
+    for name, param in model.named_parameters():
+        if name.startswith(freeze_prefixes):
+            LOGGER.info(f'freezing {name}')
+            param.requires_grad = False
 
     # Image sizey
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
@@ -363,8 +378,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     last_opt_step = -1
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
-    scheduler.last_epoch = start_epoch - 1  # do not move
-    scaler = torch.cuda.amp.GradScaler(enabled=amp)
+    scaler = GradScaler(enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
     compute_loss = ComputeLoss(model)  # init loss class
     callbacks.run('on_train_start')
@@ -374,10 +388,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f'Starting training for {epochs} epochs...')
 
     criteria_fusion = Fusionloss()
-    
+
     num_fustart=0
     num_epochs = 110 # total epoch
-    
+
     fu_lr = 1.5e-4
     fu_weight_decay = 0
     fu_batch_size = 8
@@ -389,20 +403,20 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     coeff_box_gain = 7.5 
     coeff_cls_gain = 0.5
     coeff_dfl_gain = 1.5     
-    
+
     clip_grad_norm_value = 0.01
     optim_step = 5
     optim_gamma = 0.5
-    
+
     fu_device = 'cuda' if torch.cuda.is_available() else 'cpu'
     CA1 = nn.DataParallel(CrossAttentionBlock()).to(fu_device)
     CA3 = nn.DataParallel(CrossAttentionBlock()).to(fu_device)
     CA5 = nn.DataParallel(CrossAttentionBlock()).to(fu_device)
-    
+
     optimizer1 = torch.optim.Adam(CA1.parameters(), lr=fu_lr, weight_decay=fu_weight_decay)
     optimizer3 = torch.optim.Adam(CA3.parameters(), lr=fu_lr, weight_decay=fu_weight_decay)
     optimizer5 = torch.optim.Adam(CA5.parameters(), lr=fu_lr, weight_decay=fu_weight_decay)
-    
+
     scheduler1 = torch.optim.lr_scheduler.StepLR(optimizer1, step_size=optim_step, gamma=optim_gamma)
     scheduler3 = torch.optim.lr_scheduler.StepLR(optimizer3, step_size=optim_step, gamma=optim_gamma)
     scheduler5 = torch.optim.lr_scheduler.StepLR(optimizer5, step_size=optim_step, gamma=optim_gamma)
@@ -411,24 +425,24 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     Decoder = nn.DataParallel(DE_Decoder()).to(fu_device)
     LFExtractor = nn.DataParallel(LowFreqExtractor(dim=64)).to(fu_device)
     HFExtractor = nn.DataParallel(HighFreqExtractor(num_layers=3)).to(fu_device)
-    
+
     ckpt_path = "ckpt/DCEvo_fusion.pth"
     Encoder.load_state_dict(torch.load(ckpt_path)['DE_Encoder'])
     Decoder.load_state_dict(torch.load(ckpt_path)['DE_Decoder'])
     LFExtractor.load_state_dict(torch.load(ckpt_path)['LowFreqExtractor'])
     HFExtractor.load_state_dict(torch.load(ckpt_path)['HighFreqExtractor'])
-    
+
     Encoder.requires_grad = False
     Decoder.requires_grad = False
     LFExtractor.requires_grad = False
     HFExtractor.requires_grad = False
-    
+
     MSELoss = nn.MSELoss()  
     L1Loss = nn.L1Loss()
     Loss_ssim = kornia.losses.SSIM(11, reduction='mean')
 
     vilist, irlist = read_data('datasets/M3FD/train/')
-    
+
     trainset = SimpleDataSet(vilist, irlist)
     trainloader = torch.utils.data.DataLoader(trainset,
                                               batch_size=batch_size,
@@ -440,13 +454,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     fu_loader = trainloader
 
     timestamp = datetime.now().strftime("%m-%d-%H-%M")
-    
+
     '''
     ------------------------------------------------------------------------------
     Train
     ------------------------------------------------------------------------------
     '''
-    
+
     fu_step = 0
     torch.backends.cudnn.benchmark = True
     prev_time = time.time()
@@ -481,7 +495,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     mean_dfl_loss = 1
 
     def fitnessFunction(geneticAlgorithm, solution, solution_idx):
-        
+
         for i in range(len(solution)):
             if solution[i] < 1:
                 solution[i] = 1
@@ -493,11 +507,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         solution[1] = solution[1] / coo_sum * 10.
         solution[2] = solution[2] / coo_sum * 10.
         solution[3] = solution[3] / coo_sum * 10.
-        
+
         solution[4] = solution[4] / coo_sum * 10.
         solution[5] = solution[5] / coo_sum * 10.
         solution[6] = solution[6] / coo_sum * 10.
-        
+
         outputExpected = solution[0] * mean_mse_loss_V + solution[1] * mean_mse_loss_I \
                          + solution[2] * mean_loss_decomp + solution[3] * mean_fusionloss\
                          + solution[4] * mean_box_loss + solution[5] * mean_cls_loss + solution[6] * mean_dfl_loss
@@ -532,7 +546,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         save_best_solutions=False,  # 拒绝保存best_solutions
         suppress_warnings=True,
     )
-    
+
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         callbacks.run('on_train_epoch_start')
         model.train()
@@ -545,7 +559,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             LOGGER.info("Closing dataloader mosaic")
             dataset.mosaic = False
 
-
         mloss = torch.zeros(3, device=device)  # mean losses
         if RANK != -1:
             train_loader.sampler.set_epoch(epoch)
@@ -554,7 +567,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if RANK in {-1, 0}:
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
         optimizer.zero_grad()
-    
+
         all_mse_loss_V = []
         all_mse_loss_I = []
         all_loss_decomp = []
@@ -562,11 +575,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         all_box_loss = []
         all_cls_loss = []
         all_dfl_loss = []
-        
+
         # batch ---------------------------------------------------------------------------     # position in (768, 1024)
         for i, ((imgs, targets, paths, _), 
                 (data_VIS, data_IR, patch_topleft_h, patch_topleft_w, _)) in enumerate(zip(pbar, fu_loader)):
-                    
+
             callbacks.run('on_train_batch_start')
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255  # uint8 to float32, 0-255 to 0.0-1.0
@@ -602,30 +615,30 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             all_box_loss.append(loss_items[0])
             all_cls_loss.append(loss_items[1])
             all_dfl_loss.append(loss_items[2])
-            
+
             if epoch >= num_fustart:    # num_fustart
                 data_VIS, data_IR = data_VIS.cuda(), data_IR.cuda()
                 data_VIS = data_VIS[..., 0:1, :, :]*0.299+data_VIS[..., 1:2, :, :]*0.587+data_VIS[..., 2:3, :, :]*0.114
                 data_IR = data_IR[..., 0:1, :, :]*0.299+data_IR[..., 1:2, :, :]*0.587+data_IR[..., 2:3, :, :]*0.114
-                
+
                 CA1.train()
                 CA3.train()
                 CA5.train()
-        
+
                 CA1.zero_grad()
                 CA3.zero_grad()
                 CA5.zero_grad()
-        
+
                 optimizer1.zero_grad()
                 optimizer3.zero_grad()
                 optimizer5.zero_grad()
-        
+
                 f2 = imgs
                 for ijk in range(5):
                     f2 = model.model[ijk].forward(f2)
                 f3 = (model.model[6].forward(model.model[5].forward(f2)))
                 fsppf = model.model[9].forward(model.model[8].forward(model.model[7].forward(f3)))
-                
+
                 f5 = model.model[12].forward(model.model[11].forward((model.model[10].forward(fsppf), f3)))
                 f6 = model.model[15].forward(model.model[14].forward((model.model[13].forward(f5), f2)))
 
@@ -635,29 +648,29 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                 feature_V_B, feature_V_D, feature_V = Encoder(data_VIS)
                 feature_I_B, feature_I_D, feature_I = Encoder(data_IR)
-                    
+
                 feature_V_B = CA1(feature_V_B, f6_) + feature_V_B
                 feature_V_D = CA1(feature_V_D, f6_) + feature_V_D
-                
+
                 feature_I_B = CA3(feature_I_B, f6_) + feature_I_B
                 feature_I_D = CA3(feature_I_D, f6_) + feature_I_D
-                
+
                 feature_V = CA5(feature_V, f6_) + feature_V
                 feature_I = CA5(feature_I, f6_) + feature_I
-                
+
                 feature_F_B = LFExtractor(feature_I_B+feature_V_B)
                 feature_F_D = HFExtractor(feature_I_D+feature_V_D)
-                
+
                 data_Fuse, feature_F = Decoder((data_IR+data_VIS)*0.5, feature_F_B, feature_F_D) 
-    
+
                 mse_loss_V = 5*Loss_ssim(data_VIS, data_Fuse) + MSELoss(data_VIS, data_Fuse)
                 mse_loss_I = 5*Loss_ssim(data_IR,  data_Fuse) + MSELoss(data_IR,  data_Fuse) 
-    
+
                 cc_loss_B = cc(feature_V_B, feature_I_B)
                 cc_loss_D = cc(feature_V_D, feature_I_D)
                 loss_decomp =   (cc_loss_D) ** 2 / (1.01 + cc_loss_B)  
                 fusionloss, _, _  = criteria_fusion(data_VIS, data_IR, data_Fuse)
-    
+
                 fusionttotalloss = coeff_mse_loss_VF * mse_loss_V + coeff_mse_loss_IF * \
                        mse_loss_I + coeff_decomp * loss_decomp + coeff_tv * fusionloss
 
@@ -665,7 +678,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 all_mse_loss_I.append(mse_loss_I)
                 all_loss_decomp.append(loss_decomp)
                 all_fusionloss.append(fusionloss)
-                
+
                 fusionttotalloss.backward()
                 nn.utils.clip_grad_norm_(
                     CA1.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
@@ -711,7 +724,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
         geneticAlgorithm.run()
         solution, solution_fitness, solution_idx = geneticAlgorithm.best_solution()
-        
+
         for i in range(len(solution)):
             if solution[i] < 1:
                 solution[i] = 1
@@ -734,21 +747,21 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         coeff_box_gain = solution[4]
         coeff_cls_gain = solution[5]  # alpha2 and alpha4
         coeff_dfl_gain = solution[6]
-        
+
         # adjust the learning rate       num_fustart
         if epoch >= 0:
-    
+
             scheduler1.step()  
             scheduler3.step()
             scheduler5.step()
-        
+
             if optimizer1.param_groups[0]['lr'] <= 1e-6:
                 optimizer1.param_groups[0]['lr'] = 1e-6
             if optimizer3.param_groups[0]['lr'] <= 1e-6:
                 optimizer3.param_groups[0]['lr'] = 1e-6
             if optimizer5.param_groups[0]['lr'] <= 1e-6:
                 optimizer5.param_groups[0]['lr'] = 1e-6
-            
+
             if True:
                 checkpoint = {
                     'DE_Encoder': Encoder.state_dict(),
